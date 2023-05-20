@@ -219,7 +219,7 @@ function RecordsCard(props) {
     { name: "ACT Prep ", status: props.match.tutor_act_prep },
   ];
 
-
+  console.log(subjects)
 
   return (
     <div>
@@ -458,7 +458,7 @@ function RecordsCard(props) {
                     </div>
 
                     <div className="subjectContainer">
-                      <p className="profileQuestion">3nd subject choice:</p>
+                      <p className="profileQuestion">3rd subject choice:</p>
                       {tuteeSubjects.map((tuteeSubj) => {
                         if (tuteeSubj.dbname === props.match.subject_3 && (
                           tuteeSubj.name === "Precalculus/Trigonometry " ||

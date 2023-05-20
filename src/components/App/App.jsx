@@ -125,7 +125,8 @@ function App() {
           >
             <TutorsPage />
           </ProtectedRoute>
-
+            
+            {/*FIXME*/}
           <ProtectedRoute
             // logged in shows InfoPage else shows LoginPage
             exact
