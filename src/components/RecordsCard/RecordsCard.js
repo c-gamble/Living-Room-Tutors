@@ -137,13 +137,13 @@ function RecordsCard(props) {
   ];
   console.log(props.match)
   const subjects = [
-    { name: "K-5 Math ", status: props.match.tutor_k5_Math },
-    { name: "K-5 Reading ", status: props.match.tutor_k5_Reading },
+    { name: "K-5 Math ", status: props.match.tutor_k5_math },
+    { name: "K-5 Reading ", status: props.match.tutor_k5_reading },
     {
       name: "K-5 English/Writing ",
       status: props.match.tutor_k5_English_Writing,
     },
-    { name: "K-5 Social Studies ", status: props.match.tutor_k5_Science },
+    { name: "K-5 Social Studies ", status: props.match.tutor_k5_science },
     { name: "K-5 Science ", status: props.match.tutor_k5_social_studies },
     {
       name: "6-8th Language Arts ",
