@@ -135,7 +135,7 @@ function RecordsCard(props) {
     { name: "SAT Prep ", dbname: "sat_prep" },
     { name: "ACT Prep ", dbname: "act_prep" },
   ];
-  console.log(props.match)
+  
   const subjects = [
     { name: "K-5 Math ", status: props.match.tutor_k5_math },
     { name: "K-5 Reading ", status: props.match.tutor_k5_reading },
@@ -218,8 +218,6 @@ function RecordsCard(props) {
     { name: "SAT Prep ", status: props.match.tutor_sat_prep },
     { name: "ACT Prep ", status: props.match.tutor_act_prep },
   ];
-
-  console.log(subjects)
 
   return (
     <div>
