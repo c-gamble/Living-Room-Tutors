@@ -35,6 +35,8 @@ import RecordsPage from "../RecordsPage/RecordsPage";
 import MatchPage from "../MatchPage/MatchPage";
 import HomePage from "../HomePage/HomePage";
 
+import TutorDashboard from "../TutorDashboard/TutorDashboard";
+
 import ProgressBar from "../ProgressBar/ProgressBar";
 
 function App() {
@@ -60,6 +62,11 @@ function App() {
           <Route exact path="/home">
             <HomePage />
           </Route>
+
+          <Route exact path="/TutorHome">
+            <TutorDashboard />
+          </Route>
+
 
           <Route exact path="/ProgressBar">
             <ProgressBar />
