@@ -1,4 +1,3 @@
-test
 <img src="src/images/Logo.png"/>
 <br></br>
 
