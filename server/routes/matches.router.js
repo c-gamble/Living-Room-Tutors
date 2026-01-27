@@ -1,6 +1,40 @@
 const express = require("express");
 const pool = require("../modules/pool");
 const router = express.Router();
+const {
+  rejectUnauthenticated,
+} = require("../modules/authentication-middleware");
+const matchingService = require("../services/matchingService");
+const emailService = require("../services/emailService");
+
+// Whitelist of valid subject column names to prevent SQL injection
+const VALID_SUBJECT_COLUMNS = [
+  "K5_Math", "K5_Reading", "K5_English_Writing", "K5_Science", "K5_social_studies",
+  "6th_to_8th_language_arts", "6th_to_8th_science", "6th_to_8th_social_studies",
+  "math_pre_algebra", "math_alg1_linear_alg", "math_alg2", "math_geom", "math_precalc_trig",
+  "sci_bio_life", "sci_chem", "sci_physics", "sci_comp_sci",
+  "lang_chinese", "lang_spanish", "lang_french", "lang_german",
+  "hist_world", "hist_us",
+  "ap_bio", "ap_chem", "ap_physics", "ap_calc_AB", "ap_calc_BC", "ap_stats", "ap_comp_sci",
+  "ap_english_lit_comp", "ap_lang_comp", "ap_macro_econ", "ap_micro_econ", "ap_psyc",
+  "ap_hist_us", "ap_gov_politics_us", "ap_human_geog",
+  "sat_subject_tests", "sat_prep", "act_prep", "other"
+];
+
+// Whitelist of valid grade column names
+const VALID_GRADE_COLUMNS = [
+  "prek_kindergarten", "1st", "2nd", "3rd", "4th", "5th", "6th",
+  "7th", "8th", "9th", "10th", "11th", "12th"
+];
+
+// Validate column name against whitelist
+function isValidSubjectColumn(column) {
+  return VALID_SUBJECT_COLUMNS.includes(column);
+}
+
+function isValidGradeColumn(column) {
+  return VALID_GRADE_COLUMNS.includes(column);
+}
 
 /**
  * GET route template
@@ -14,6 +48,8 @@ tutor_id,
 tutee_id,
 match_timestamp,
 emails_sent,
+match_type,
+match_score,
 tutor_first_name,
 tutor_last_name,
 tutors.pronouns AS tutor_pronouns,
@@ -138,7 +174,15 @@ ORDER BY match_timestamp DESC;`;
 // match search group A
 router.get("/groupA", (req, res) => {
   console.log("in tutors.router/get");
-  const query = `SELECT 
+
+  // Validate column names to prevent SQL injection
+  const { subject1, subject2, subject3, grade } = req.query;
+  if (!isValidSubjectColumn(subject1) || !isValidSubjectColumn(subject2) ||
+      !isValidSubjectColumn(subject3) || !isValidGradeColumn(grade)) {
+    return res.status(400).send("Invalid subject or grade parameter");
+  }
+
+  const query = `SELECT
   tutors.id,
   tutor_first_name,
   tutor_last_name,
@@ -197,7 +241,7 @@ tutors.email AS tutor_email,
           subjects_tutors."ap_lang_comp" AS tutor_ap_lang_comp,
           subjects_tutors."ap_macro_econ" AS tutor_ap_macro_econ,
           subjects_tutors."ap_micro_econ" AS tutor_ap_micro_econ,
-          subjects_tutors."ap_psyc" AS tutor_ap_psyc, 
+          subjects_tutors."ap_psyc" AS tutor_ap_psyc,
           subjects_tutors."ap_hist_us" AS tutor_ap_hist_us,
   subjects_tutors."ap_gov_politics_us" AS tutor_ap_gov_politics_us,
   subjects_tutors."ap_human_geog" AS tutor_ap_human_geog,
@@ -219,11 +263,11 @@ tutors.email AS tutor_email,
   JOIN subjects_tutors ON tutors.subjects_id = subjects_tutors.id
   JOIN "language" ON tutors.language_tutor_id = "language".id
   JOIN mentoring_grade ON tutors.mentoring_grade_id = mentoring_grade.id
-  WHERE tutors.active_tutor = true and tutors.matched = false 
-  and subjects_tutors."${req.query.subject1}" = true 
-  and subjects_tutors."${req.query.subject2}" = true 
-  and subjects_tutors."${req.query.subject3}" = true 
-  and mentoring_grade."${req.query.grade}" = true
+  WHERE tutors.active_tutor = true and tutors.matched = false
+  and subjects_tutors."${subject1}" = true
+  and subjects_tutors."${subject2}" = true
+  and subjects_tutors."${subject3}" = true
+  and mentoring_grade."${grade}" = true
   ORDER BY tutor_last_name ASC; `;
   pool
     .query(query)
@@ -239,7 +283,15 @@ tutors.email AS tutor_email,
 // match search group B
 router.get("/groupB", (req, res) => {
   console.log("in tutors.router/get", req.query);
-  const query = `SELECT 
+
+  // Validate column names to prevent SQL injection
+  const { subject1, subject2, subject3, grade } = req.query;
+  if (!isValidSubjectColumn(subject1) || !isValidSubjectColumn(subject2) ||
+      !isValidSubjectColumn(subject3) || !isValidGradeColumn(grade)) {
+    return res.status(400).send("Invalid subject or grade parameter");
+  }
+
+  const query = `SELECT
   tutors.id,
   tutor_first_name,
   tutor_last_name,
@@ -298,7 +350,7 @@ tutors.email AS tutor_email,
           subjects_tutors."ap_lang_comp" AS tutor_ap_lang_comp,
           subjects_tutors."ap_macro_econ" AS tutor_ap_macro_econ,
           subjects_tutors."ap_micro_econ" AS tutor_ap_micro_econ,
-          subjects_tutors."ap_psyc" AS tutor_ap_psyc, 
+          subjects_tutors."ap_psyc" AS tutor_ap_psyc,
           subjects_tutors."ap_hist_us" AS tutor_ap_hist_us,
   subjects_tutors."ap_gov_politics_us" AS tutor_ap_gov_politics_us,
   subjects_tutors."ap_human_geog" AS tutor_ap_human_geog,
@@ -320,11 +372,11 @@ tutors.email AS tutor_email,
   JOIN subjects_tutors ON tutors.subjects_id = subjects_tutors.id
   JOIN "language" ON tutors.language_tutor_id = "language".id
   JOIN mentoring_grade ON tutors.mentoring_grade_id = mentoring_grade.id
-  WHERE tutors.active_tutor = true and tutors.matched = false 
-  and subjects_tutors."${req.query.subject1}" = true 
-  and subjects_tutors."${req.query.subject2}" = true 
-  and subjects_tutors."${req.query.subject3}" = false 
-  and mentoring_grade."${req.query.grade}" = true
+  WHERE tutors.active_tutor = true and tutors.matched = false
+  and subjects_tutors."${subject1}" = true
+  and subjects_tutors."${subject2}" = true
+  and subjects_tutors."${subject3}" = false
+  and mentoring_grade."${grade}" = true
   ORDER BY tutor_last_name ASC; `;
   pool
     .query(query)
@@ -340,8 +392,15 @@ tutors.email AS tutor_email,
 // match search group C
 router.get("/groupC", (req, res) => {
   console.log("in tutors.router/get", req.query);
-  const query = `SELECT 
-  
+
+  // Validate column names to prevent SQL injection
+  const { subject1, subject2, subject3, grade } = req.query;
+  if (!isValidSubjectColumn(subject1) || !isValidSubjectColumn(subject2) ||
+      !isValidSubjectColumn(subject3) || !isValidGradeColumn(grade)) {
+    return res.status(400).send("Invalid subject or grade parameter");
+  }
+
+  const query = `SELECT
   tutors.id,
   tutor_first_name,
   tutor_last_name,
@@ -400,7 +459,7 @@ tutors.email AS tutor_email,
           subjects_tutors."ap_lang_comp" AS tutor_ap_lang_comp,
           subjects_tutors."ap_macro_econ" AS tutor_ap_macro_econ,
           subjects_tutors."ap_micro_econ" AS tutor_ap_micro_econ,
-          subjects_tutors."ap_psyc" AS tutor_ap_psyc, 
+          subjects_tutors."ap_psyc" AS tutor_ap_psyc,
           subjects_tutors."ap_hist_us" AS tutor_ap_hist_us,
   subjects_tutors."ap_gov_politics_us" AS tutor_ap_gov_politics_us,
   subjects_tutors."ap_human_geog" AS tutor_ap_human_geog,
@@ -422,11 +481,11 @@ tutors.email AS tutor_email,
   JOIN subjects_tutors ON tutors.subjects_id = subjects_tutors.id
   JOIN "language" ON tutors.language_tutor_id = "language".id
   JOIN mentoring_grade ON tutors.mentoring_grade_id = mentoring_grade.id
-  WHERE tutors.active_tutor = true and tutors.matched = false 
-  and subjects_tutors."${req.query.subject1}" = true 
-  and subjects_tutors."${req.query.subject2}" = false 
-  and subjects_tutors."${req.query.subject3}" = true 
-  and mentoring_grade."${req.query.grade}" = true
+  WHERE tutors.active_tutor = true and tutors.matched = false
+  and subjects_tutors."${subject1}" = true
+  and subjects_tutors."${subject2}" = false
+  and subjects_tutors."${subject3}" = true
+  and mentoring_grade."${grade}" = true
   ORDER BY tutor_last_name ASC; `;
   pool
     .query(query)
@@ -442,7 +501,15 @@ tutors.email AS tutor_email,
 // match search group D
 router.get("/groupD", (req, res) => {
   console.log("in tutors.router/get");
-  const query = `SELECT 
+
+  // Validate column names to prevent SQL injection
+  const { subject1, subject2, subject3, grade } = req.query;
+  if (!isValidSubjectColumn(subject1) || !isValidSubjectColumn(subject2) ||
+      !isValidSubjectColumn(subject3) || !isValidGradeColumn(grade)) {
+    return res.status(400).send("Invalid subject or grade parameter");
+  }
+
+  const query = `SELECT
   tutors.id,
   tutor_first_name,
   tutor_last_name,
@@ -501,7 +568,7 @@ tutors.email AS tutor_email,
           subjects_tutors."ap_lang_comp" AS tutor_ap_lang_comp,
           subjects_tutors."ap_macro_econ" AS tutor_ap_macro_econ,
           subjects_tutors."ap_micro_econ" AS tutor_ap_micro_econ,
-          subjects_tutors."ap_psyc" AS tutor_ap_psyc, 
+          subjects_tutors."ap_psyc" AS tutor_ap_psyc,
           subjects_tutors."ap_hist_us" AS tutor_ap_hist_us,
   subjects_tutors."ap_gov_politics_us" AS tutor_ap_gov_politics_us,
   subjects_tutors."ap_human_geog" AS tutor_ap_human_geog,
@@ -524,11 +591,11 @@ tutors.email AS tutor_email,
   JOIN subjects_tutors ON tutors.subjects_id = subjects_tutors.id
   JOIN "language" ON tutors.language_tutor_id = "language".id
   JOIN mentoring_grade ON tutors.mentoring_grade_id = mentoring_grade.id
-  WHERE tutors.active_tutor = true and tutors.matched = false 
-  and subjects_tutors."${req.query.subject1}" = true 
-  and subjects_tutors."${req.query.subject2}" = false 
-  and subjects_tutors."${req.query.subject3}" = false 
-  and mentoring_grade."${req.query.grade}" = true
+  WHERE tutors.active_tutor = true and tutors.matched = false
+  and subjects_tutors."${subject1}" = true
+  and subjects_tutors."${subject2}" = false
+  and subjects_tutors."${subject3}" = false
+  and mentoring_grade."${grade}" = true
   ORDER BY tutor_last_name ASC; `;
   pool
     .query(query)
@@ -569,14 +636,15 @@ router.post("/", (req, res) => {
 
 router.put("/matchStatus/", (req, res) => {
   console.log("in /MatchStatus - tutor", req.body);
-  const queryString = `UPDATE "tutors" SET matched = true WHERE id=${req.body.tutor_id};`;
+  // Fixed: Using parameterized queries to prevent SQL injection
+  const tutorQuery = `UPDATE "tutors" SET matched = true WHERE id = $1;`;
   pool
-    .query(queryString)
+    .query(tutorQuery, [req.body.tutor_id])
     .then((result) => {
       console.log("in /MatchStatus - tutee", req.body.tutee_id);
-      const queryString = `UPDATE "tutees" SET matched = true WHERE id=${req.body.tutee_id};`;
+      const tuteeQuery = `UPDATE "tutees" SET matched = true WHERE id = $1;`;
       pool
-        .query(queryString)
+        .query(tuteeQuery, [req.body.tutee_id])
         .then((result) => {
           res.sendStatus(201);
         })
@@ -588,11 +656,137 @@ router.put("/matchStatus/", (req, res) => {
     .catch((err) => {
       console.log("changeStatus failed: ", err);
       res.sendStatus(500);
-    })
-    .catch((err) => {
-      console.log("error posting to subject_tutor", err);
-      res.sendStatus(500);
     });
+});
+
+/**
+ * POST /api/matches/auto-match
+ * Run batch auto-matching for all unmatched tutees
+ */
+router.post("/auto-match", rejectUnauthenticated, async (req, res) => {
+  console.log("Running batch auto-matching");
+  try {
+    const sendEmails = req.body.sendEmails !== false; // Default to true
+    const result = await matchingService.runBatchMatching(sendEmails);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Batch auto-match error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/matches/auto-match/:tuteeId
+ * Auto-match a specific tutee
+ */
+router.post("/auto-match/:tuteeId", rejectUnauthenticated, async (req, res) => {
+  const tuteeId = parseInt(req.params.tuteeId, 10);
+  if (isNaN(tuteeId)) {
+    return res.status(400).json({ error: "Invalid tutee ID" });
+  }
+
+  console.log(`Auto-matching tutee ${tuteeId}`);
+  try {
+    const sendEmails = req.body.sendEmails !== false; // Default to true
+    const result = await matchingService.autoMatchTutee(tuteeId, sendEmails);
+
+    if (result.success) {
+      res.status(201).json(result);
+    } else {
+      res.status(200).json(result); // No match found, but not an error
+    }
+  } catch (err) {
+    console.error(`Auto-match error for tutee ${tuteeId}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/matches/:matchId/send-emails
+ * Manually trigger emails for an existing match
+ */
+router.post("/:matchId/send-emails", rejectUnauthenticated, async (req, res) => {
+  const matchId = parseInt(req.params.matchId, 10);
+  if (isNaN(matchId)) {
+    return res.status(400).json({ error: "Invalid match ID" });
+  }
+
+  console.log(`Sending emails for match ${matchId}`);
+  try {
+    // Get match details with tutor and tutee info
+    const matchQuery = `
+      SELECT
+        matches.id,
+        tutor_id,
+        tutee_id,
+        emails_sent,
+        tutor_first_name,
+        tutor_last_name,
+        tutors.phone AS tutor_phone,
+        tutors.email AS tutor_email,
+        tutors.grade_level AS tutor_grade,
+        tutors.school AS tutor_school,
+        student_first_name AS tutee_firstname,
+        student_last_name AS tutee_lastname,
+        student_or_guardian,
+        email_guardian,
+        email_student,
+        tutees.phone AS tutee_phone,
+        tutees.grade_level AS tutee_grade,
+        tutees.school AS tutee_school,
+        tutees.subject_details AS tutee_subject_details,
+        tutees.misc_info AS tutee_misc_info,
+        Subject1.subject AS subject_1,
+        Subject2.subject AS subject_2,
+        Subject3.subject AS subject_3
+      FROM matches
+      JOIN tutors ON matches.tutor_id = tutors.id
+      JOIN tutees ON matches.tutee_id = tutees.id
+      INNER JOIN subjects_tutees AS Subject1 ON Subject1.id = tutees.subject_1
+      INNER JOIN subjects_tutees AS Subject2 ON Subject2.id = tutees.subject_2
+      INNER JOIN subjects_tutees AS Subject3 ON Subject3.id = tutees.subject_3
+      WHERE matches.id = $1;
+    `;
+
+    const matchResult = await pool.query(matchQuery, [matchId]);
+    if (matchResult.rows.length === 0) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    const match = matchResult.rows[0];
+
+    // Format tutor and tutee objects for email service
+    const tutor = {
+      tutor_first_name: match.tutor_first_name,
+      tutor_last_name: match.tutor_last_name,
+      tutor_email: match.tutor_email,
+      tutor_phone: match.tutor_phone,
+      tutor_grade: match.tutor_grade,
+      tutor_school: match.tutor_school,
+    };
+
+    const tutee = {
+      tutee_firstname: match.tutee_firstname,
+      tutee_lastname: match.tutee_lastname,
+      student_or_guardian: match.student_or_guardian,
+      email_guardian: match.email_guardian,
+      email_student: match.email_student,
+      tutee_phone: match.tutee_phone,
+      tutee_grade: match.tutee_grade,
+      tutee_school: match.tutee_school,
+      tutee_subject_details: match.tutee_subject_details,
+      tutee_misc_info: match.tutee_misc_info,
+      subject_1: match.subject_1,
+      subject_2: match.subject_2,
+      subject_3: match.subject_3,
+    };
+
+    const emailResult = await emailService.sendMatchNotifications(matchId, tutor, tutee);
+    res.status(200).json(emailResult);
+  } catch (err) {
+    console.error(`Send emails error for match ${matchId}:`, err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

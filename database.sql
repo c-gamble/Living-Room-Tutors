@@ -61,6 +61,8 @@ CREATE TABLE "matches" (
 	"tutee_id" integer NOT NULL,
 	"match_timestamp" TIMESTAMP NOT NULL,
 	"emails_sent" BOOLEAN NOT NULL,
+	"match_type" varchar(20) DEFAULT 'manual',
+	"match_score" integer,
 	CONSTRAINT "matches_pk" PRIMARY KEY ("id")
 ) WITH (
   OIDS=FALSE
