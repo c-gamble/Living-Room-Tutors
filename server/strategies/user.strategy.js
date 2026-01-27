@@ -8,6 +8,11 @@ passport.serializeUser((user, done) => {
 });
 
 passport.deserializeUser((id, done) => {
+  // Shortcut for local development: when SKIP_AUTH=true we treat the session as an already-authenticated dev user.
+  if (process.env.SKIP_AUTH === 'true' && id === -1) {
+    return done(null, { id: -1, first_name: 'dev', admin: true });
+  }
+
   pool
     .query('SELECT * FROM "admin" WHERE id = $1', [id])
     .then((result) => {
@@ -38,6 +43,11 @@ passport.deserializeUser((id, done) => {
 passport.use(
   'local',
   new LocalStrategy((username, password, done) => {
+    // Hacky local bypass: when SKIP_AUTH=true, accept any username/password and return a dev user.
+    if (process.env.SKIP_AUTH === 'true') {
+      return done(null, { id: -1, first_name: 'dev', admin: true });
+    }
+
     pool
       .query('SELECT * FROM "admin" WHERE first_name = $1', [username])
       .then((result) => {
