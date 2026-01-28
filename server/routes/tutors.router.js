@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../modules/pool");
 const router = express.Router();
+const matchingService = require("../services/matchingService");
 
 /**
  * GET route template
@@ -324,7 +325,8 @@ RETURNING "id";`;
               const submissionTimestamp = new Date(Date.now()).toISOString();
               const insertTutorQuery = `
                 INSERT INTO "tutors" ("tutor_first_name", "tutor_last_name", "pronouns", "phone", "email", "grade_level", "school", "mentoring_grade_id", "language_tutor_id", "subjects_id", "misc_info", "submission_timestamp", "active_tutor", "matched"  )
-                VALUES  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14 );`;
+                VALUES  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14 )
+                RETURNING "id";`;
               pool
                 .query(insertTutorQuery, [
                   req.body.firstName,
@@ -343,6 +345,23 @@ RETURNING "id";`;
                   false,
                 ])
                 .then((result) => {
+                  const newTutorId = result.rows[0].id;
+                  console.log("New tutor created with ID:", newTutorId);
+
+                  // Attempt auto-match for the new tutor (non-blocking)
+                  // This tries to find a waiting tutee that matches this tutor
+                  matchingService.autoMatchTutor(newTutorId, true)
+                    .then((matchResult) => {
+                      if (matchResult.success) {
+                        console.log(`Auto-match successful for new tutor ${newTutorId}:`, matchResult);
+                      } else {
+                        console.log(`No auto-match for new tutor ${newTutorId}:`, matchResult.reason);
+                      }
+                    })
+                    .catch((err) => {
+                      console.error(`Auto-match error for new tutor ${newTutorId}:`, err.message);
+                    });
+
                   res.sendStatus(201);
                 })
                 .catch((err) => {

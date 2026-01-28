@@ -608,30 +608,51 @@ tutors.email AS tutor_email,
     });
 });
 /**
- * POST route template
+ * POST route template - Manual match with automatic email sending
  */
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   console.log("matches.router/post", req.body);
   const submissionTimestamp = new Date(Date.now()).toISOString();
-  const queryString = `INSERT INTO "matches" ("tutor_id", "tutee_id", "match_timestamp", "emails_sent")
-  VALUES ($1, $2, $3, $4)
+  const queryString = `INSERT INTO "matches" ("tutor_id", "tutee_id", "match_timestamp", "emails_sent", "match_type")
+  VALUES ($1, $2, $3, $4, $5)
   RETURNING "id";`;
 
   let values = [
     req.body.tutor_id,
     req.body.tutee_id,
     submissionTimestamp,
-    true,
+    false, // Will be set to true after emails are sent
+    "manual",
   ];
-  pool
-    .query(queryString, values)
-    .then((results) => {
-      res.sendStatus(201);
-    })
-    .catch((error) => {
-      console.log(error);
-      res.sendStatus(500);
-    });
+
+  try {
+    const matchResult = await pool.query(queryString, values);
+    const matchId = matchResult.rows[0].id;
+
+    // Get tutor and tutee data for email sending
+    const tutor = await matchingService.getTutorById(req.body.tutor_id);
+    const tutee = await matchingService.getTuteeById(req.body.tutee_id);
+
+    if (tutor && tutee) {
+      // Send emails automatically (non-blocking)
+      emailService.sendMatchNotifications(matchId, tutor, tutee)
+        .then((emailResult) => {
+          if (emailResult.success) {
+            console.log(`Manual match ${matchId}: Emails sent successfully`);
+          } else {
+            console.log(`Manual match ${matchId}: Some emails failed:`, emailResult.errors);
+          }
+        })
+        .catch((err) => {
+          console.error(`Manual match ${matchId}: Email sending error:`, err.message);
+        });
+    }
+
+    res.status(201).json({ matchId });
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
 });
 
 router.put("/matchStatus/", (req, res) => {
